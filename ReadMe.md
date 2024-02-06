@@ -1,0 +1,2 @@
+# Flash Card App
+One of my friends talked about wanting to have a flash card app that would keep track better of errors and successes to quiz her better and help her learn Spanish. This was created to fulfill that need. One of the main features of this app is that it will keep track of the times that one has got the same thing wrong or right in a row so as to present the wrong ones again faster and help one review those items and to present the correct ones at a much less frequent rate.
