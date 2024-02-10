@@ -4,6 +4,7 @@
 import sys, os
 import random
 import json
+import re
 
 # third party imports
 import pyautogui
@@ -41,14 +42,17 @@ class Button:
             return True
         return False
 
-# pyautogui.alert(pd.read_csv(program_folder + "\\game_data.csv"))
-
 pygame.init()
 
 class Game:
     def __init__(self):
+        # Get maximum screen size
+        display_info = pygame.display.Info()
+        max_width, max_height = display_info.current_w, display_info.current_h
+
         # general settings
         self.window = "main_menu"
+        self.screen = pygame.display.set_mode((max_width, max_height - 100), pygame.RESIZABLE)
 
         # loaded game settings
         self.is_paused = False
@@ -56,19 +60,20 @@ class Game:
         self.df = self.load_data(program_folder + "\\game_data.csv")
         self.columns = [100, 250, 400, 550, 700, 850]
         self.thumbs_up = pygame.image.load(program_folder + "\\thumbs-up-solid.png")
-        self.font = pygame.font.SysFont(None, 50)
-        print("running")
+        self.font = pygame.font.Font(program_folder + "\\fonts\\CharisSIL-Regular.ttf", 24)
         self.thumbs_up_count = 3
         self.user_text = 'Your response: '
         self.speed_y = 1
         self.x = random.choice(self.columns)
-        print(len(self.df))
         self.y = 20
         self.prompt, self.question_picked = self.pick_a_question(self.df)
         self.text_surface = self.render_text(self.prompt, self.font)
         
 
     def render_text(self, message, font, color=(255, 255, 255)):
+        # 3400 is an approximate for a boundary to switching to the Chinese font...many are a lot higher though...
+        if max([ord(character) for character in message]) > 3400:
+                font = pygame.font.Font(program_folder + "\\fonts\\MSYH.TTC", 24)
         return font.render(message, True, color)
 
     def pick_a_question(self, df):
@@ -80,7 +85,7 @@ class Game:
 
     def load_data(self,file_path):
         try:
-            return pd.read_csv(file_path,index_col=0,dtype={'answer': object})
+            return pd.read_csv(file_path,index_col=0,dtype={'answer': object}, encoding="utf8")
         except:
             return None
         
@@ -89,7 +94,7 @@ class Game:
 
     def run_main_pygame_loop(self):
         pygame.display.set_caption("Flash Card App")
-        screen = pygame.display.set_mode((1280, 800))
+        screen = self.screen
         font = pygame.font.SysFont(None, 50)
 
         GREEN = (0, 255, 0)
@@ -106,7 +111,6 @@ class Game:
     
         main_menu_buttons = [[load_button,"load"],[start_button,"main_game"],[high_scores_button,"high_scores"]]
         game_over_screen_buttons = [[new_game_button,"main_game"],[main_menu_button,"main_menu"]]
-
         running = True
 
         while running:
@@ -162,15 +166,25 @@ class Game:
 
     def pausable_screen(self,repair_button,pause_button,screen,RED,GREEN,running,main_menu_button,main_game_function):
         for event in pygame.event.get():
+            window_size = self.screen.get_size()
+            # Convert ~Number~ into the corresponding character
+            if re.search(r"~([0-9]{1,})~",self.user_text):
+                polished_user_text = ""
+                for text_item in self.user_text.split("~"):
+                    if text_item.isnumeric():
+                        polished_user_text += chr(int(text_item))
+                    else:
+                        polished_user_text += text_item
+                self.user_text = polished_user_text
             if event.type == pygame.QUIT:
                 running = False
-            
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pygame.VIDEORESIZE:
+                pyautogui.alert("hi")
+            elif event.type == pygame.MOUSEBUTTONDOWN:
                 if pause_button.is_over(pygame.mouse.get_pos()):
                     self.is_paused = not self.is_paused
                     pause_button.text = 'Resume' if self.is_paused else 'Pause'
                     pause_button.color = RED if self.is_paused else GREEN
-                    print("Game Paused!" if self.is_paused else "Game Resumed!")
                 if main_menu_button.is_over(pygame.mouse.get_pos()):
                     self.window = "main_menu"
                 else:
@@ -185,8 +199,7 @@ class Game:
             main_game_function(screen,repair_button)
 
         for button in [main_menu_button, pause_button]:
-            main_menu_button.draw(screen)
-            pause_button.draw(screen)
+            button.draw(screen)
 
         pygame.display.flip()
         return running
@@ -264,7 +277,7 @@ class Game:
                 self.window = "game_over"
 
             # Cap the frame rate
-            _ = pygame.time.Clock().tick(6000)
+            _ = pygame.time.Clock().tick(60)
         self.df.to_csv(program_folder + "\\game_data.csv")
 
 if __name__ == "__main__":
